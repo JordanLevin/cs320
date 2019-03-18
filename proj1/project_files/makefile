@@ -1,7 +1,7 @@
 all: main.cpp
-	g++ -std=c++11 main.cpp -Wall -Wextra -pedantic -o predict
+	g++ -std=c++11 main.cpp -Wall -Wextra -pedantic -g -o predictors
 
 test: all
-	./predict traces/short_trace1.txt test1.out
+	./predictors traces/short_trace1.txt test1.out
 
 run: all
