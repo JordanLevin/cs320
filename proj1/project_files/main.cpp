@@ -212,15 +212,11 @@ int main(int argc, char** argv) {
     Trace t = read(argv[1]);
     std::string output = argv[2];
 
-    // Hack to delete output file
-    // std::fstream temp(output, std::ios::trunc);
-    // temp << "BLEEEE";
-    // temp.close();
-
     always_taken(t).print(output);
     always_not_taken(t).print(output);
     bimodal_single(t).print(output);
     bimodal_double(t).print(output);
     gshare(t).print(output);
     tournament(t).print(output);
+    //perceptron(t).print(output);
 }
