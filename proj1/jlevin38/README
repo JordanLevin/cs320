@@ -1,0 +1,7 @@
+Jordan Levin
+jlevin38
+B00634552
+
+Everything works, extra credit is included in perceptron.cpp. One note is that the
+output relies on appending to files so the output file needs to be deleted if the same
+file name is used.
