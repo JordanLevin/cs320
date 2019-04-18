@@ -12,6 +12,7 @@ struct DoubleLL {
         Node(int v): val{v}{}
     };
     Node* head = nullptr;
+    Node* tail = nullptr;
 
     Node* insert(int val){
         if(head == nullptr){
@@ -19,7 +20,10 @@ struct DoubleLL {
             tail = head;
         }
         else{
-            head = new Node(head, nullptr, val);
+            Node* n = new Node(val);
+            n->next = head;
+            head->prev = n;
+            head = n;
         }
         return head;
     }
@@ -34,7 +38,7 @@ struct LRU {
     }
 
     void access(int val){
-        if(map.find(val) == map.end()){
+        if(map.count(val) == 0){
             map[val] = entries.insert(val);
         }
         else{
@@ -42,11 +46,15 @@ struct LRU {
             //take node n out of the list
             if(n->prev)
                 n->prev->next = n->next;
+            else
+                entries.head = n->next;
             if(n->next)
                 n->next->prev = n->prev;
-            n->next = head;
+            else
+                entries.tail = n->prev;
+            n->next = entries.head;
             n->prev = nullptr;
-            entries.head = newnode;
+            entries.head = n;
         }
     }
 };
