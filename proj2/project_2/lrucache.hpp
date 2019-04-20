@@ -2,6 +2,7 @@
 #define LRUCACHE_H
 
 #include <unordered_map>
+#include <iostream>
 
 struct DoubleLL {
     struct Node {
@@ -27,6 +28,11 @@ struct DoubleLL {
         }
         return head;
     }
+    void print(){
+        for(Node* n = head; n != nullptr; n = n->next)
+            std::cout << n->val << "->";
+        std::cout << std::endl;
+    }
 };
 
 struct LRU {
@@ -43,14 +49,14 @@ struct LRU {
         }
         else{
             DoubleLL::Node* n = map[val];
+            if(n == entries.head)
+                return;
             //take node n out of the list
             if(n->prev)
                 n->prev->next = n->next;
-            else
-                entries.head = n->next;
             if(n->next)
                 n->next->prev = n->prev;
-            else
+            else if(n->prev)
                 entries.tail = n->prev;
             n->next = entries.head;
             n->prev = nullptr;
