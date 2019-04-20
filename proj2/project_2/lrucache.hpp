@@ -52,13 +52,16 @@ struct LRU {
             if(n == entries.head)
                 return;
             //take node n out of the list
-            if(n->prev)
-                n->prev->next = n->next;
+            n->prev->next = n->next;
             if(n->next)
                 n->next->prev = n->prev;
-            else if(n->prev)
+            else{
                 entries.tail = n->prev;
+                if(entries.tail->prev == nullptr)
+                    entries.tail->prev = n;
+            }
             n->next = entries.head;
+            entries.head->prev = n;
             n->prev = nullptr;
             entries.head = n;
         }

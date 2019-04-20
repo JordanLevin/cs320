@@ -13,7 +13,7 @@ Result direct_mapped(const Trace& t) {
     std::vector<std::pair<int, int>> results;
     for(int size: {1024/32, 1024*4/32, 1024*16/32, 1024*32/32}){
         //issue is size is 32 so everything indexes into 32
-        std::vector<std::pair<bool, std::uint64_t>> cache(size);
+        std::vector<std::pair<bool, std::uint32_t>> cache(size);
         std::pair<int, int> result = std::make_pair(0, 0);
         for (auto p : t.accesses) {
             //Calculate the cache line and the index
@@ -35,8 +35,8 @@ Result set_associative(const Trace& t) {
     std::vector<std::pair<int, int>> results;
     for(int assoc: {2, 4, 8, 16}){
         int size = ((1024*16)/32)/assoc;
-        std::vector<std::vector<std::pair<bool, std::uint64_t>>> 
-            cache(size, std::vector<std::pair<bool, std::uint64_t>>(assoc));
+        std::vector<std::vector<std::pair<bool, std::uint32_t>>> 
+            cache(size, std::vector<std::pair<bool, std::uint32_t>>(assoc));
         std::vector<LRU> least_used(size);
         std::pair<int, int> result = std::make_pair(0, 0);
 
