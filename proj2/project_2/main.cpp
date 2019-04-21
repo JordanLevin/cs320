@@ -84,6 +84,75 @@ Result set_associative(const Trace& t) {
     return ret;
 }
 
+Result fully_associative(const Trace& t) {
+    Result ret;
+    std::vector<std::pair<int, int>> results;
+    int assoc = 1024*16/32; //associativity is 16kb/line size
+    //int assoc = 4;
+    std::vector<std::pair<bool, std::uint32_t>> cache(assoc);
+    std::vector<bool> hotcold(assoc-1);
+    std::pair<int, int> result = std::make_pair(0, 0);
+
+    for (auto p : t.accesses) {
+        //Calculate the cache line and the index
+        std::uint32_t line = p.first - p.first%32;
+        int index = -1;
+        for(int i = 0; i < cache.size(); i++){
+            if(cache[i].first && cache[i].second == line){
+                result.first++;
+                index = i;
+                break;
+            }
+        }
+        int start = 0, end = hotcold.size(), hcindex, prev = -1;
+        while(true){
+            hcindex = (start + end)/2;
+            //std::cout << start << " " << end << std::endl;
+
+            if(index == -1){
+                if(hotcold[hcindex])
+                    end = hcindex;
+                else
+                    start = hcindex+1;
+            }
+
+            if(index != -1 && prev != hcindex){
+                if(index > hcindex){
+                    hotcold[hcindex] = 1;
+                    start = hcindex+1;
+                }
+                else if(index <= hcindex){
+                    hotcold[hcindex] = 0;
+                    end = hcindex;
+                }
+            }
+
+
+            if(index == -1 && prev != hcindex){
+                hotcold[hcindex] = !hotcold[hcindex];
+            }
+            prev = hcindex;
+            
+            //Binary search has finished
+            if(end-start <= 0){
+                //If there was a cache miss then evict the LRU
+                //Otherwise the hotcold bits are updated and we're done
+                if(index == -1){
+                    if(hotcold[hcindex] == 1)
+                        cache[hcindex+1] = std::make_pair(true, line);
+                    else
+                        cache[hcindex] = std::make_pair(true, line);
+                }
+                break;
+            }
+        }
+
+        result.second++;
+    }
+    ret.res.push_back(result);
+    return ret;
+}
+
 
 int main(int argc, char** argv) {
     if(argc != 3){
@@ -95,4 +164,5 @@ int main(int argc, char** argv) {
 
     direct_mapped(t).print(output, true);
     set_associative(t).print(output);
+    fully_associative(t).print(output);
 }
