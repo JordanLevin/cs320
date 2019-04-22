@@ -256,10 +256,10 @@ Result set_associative_no_alloc(const Trace& t) {
 }
 
 
-Result set_associative_prefetch(const Trace& t) {
+Result set_associative_prefetch(const Trace& t, bool on_miss=false) {
     Result ret;
     std::vector<std::pair<int, int>> results;
-    for (int assoc : {4}) {
+    for (int assoc : {2, 4, 8, 16}) {
         int size = ((1024 * 16) / 32) / assoc;
         std::vector<std::vector<std::pair<bool, std::uint32_t>>> cache(
             size, std::vector<std::pair<bool, std::uint32_t>>(assoc));
@@ -301,12 +301,20 @@ Result set_associative_prefetch(const Trace& t) {
                     lru.access(evict);
                 }
             }
+            //Code only triggered for prefetch_on_miss
+            if(on_miss == true && hit){
+                result.first++;
+                continue;
+            }
             // look for a hit on the prefetch line
+            index = ((p.first+32) % (size * 32)) / 32;
+            auto& ways_pref = cache[index];
+            auto& lru_pref = least_used[index];
             bool hit_pref = false;
             for (int i = 0; i < assoc; ++i) {
-                if (ways[i].first && ways[i].second == line+32) {
+                if (ways_pref[i].first && ways_pref[i].second == line+32) {
                     hit_pref = true;
-                    lru.access(i);
+                    lru_pref.access(i);
                     break;
                 }
             }
@@ -314,18 +322,18 @@ Result set_associative_prefetch(const Trace& t) {
                 // find an empty spot in the cache
                 bool filled_pref = false;
                 for (int i = 0; i < assoc; ++i) {
-                    if (ways[i].first == false) {
-                        lru.access(i);
-                        ways[i] = std::make_pair(true, line+32);
+                    if (ways_pref[i].first == false) {
+                        lru_pref.access(i);
+                        ways_pref[i] = std::make_pair(true, line+32);
                         filled_pref = true;
                         break;
                     }
                 }
                 // otherwise evict something
                 if (!filled_pref) {
-                    int evict = lru.getLRU();
-                    ways[evict] = std::make_pair(true, line+32);
-                    lru.access(evict);
+                    int evict = lru_pref.getLRU();
+                    ways_pref[evict] = std::make_pair(true, line+32);
+                    lru_pref.access(evict);
                 }
             }
             if (hit)
@@ -334,6 +342,10 @@ Result set_associative_prefetch(const Trace& t) {
         ret.res.push_back(result);
     }
     return ret;
+}
+
+Result prefetch_on_miss(const Trace& t){
+    return set_associative_prefetch(t, true);
 }
 
 
@@ -352,4 +364,5 @@ int main(int argc, char** argv) {
     fully_associative(t).print(output);
     set_associative_no_alloc(t).print(output);
     set_associative_prefetch(t).print(output);
+    prefetch_on_miss(t).print(output);
 }
