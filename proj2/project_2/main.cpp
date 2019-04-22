@@ -1,25 +1,26 @@
 #include <cstdint>
+#include <deque>
 #include <iostream>
 #include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
-#include <deque>
-#include "utils.hpp"
 #include "lrucache.hpp"
+#include "utils.hpp"
 
 Result direct_mapped(const Trace& t) {
     Result ret;
     std::vector<std::pair<int, int>> results;
-    for(int size: {1024/32, 1024*4/32, 1024*16/32, 1024*32/32}){
-        //issue is size is 32 so everything indexes into 32
+    for (int size :
+         {1024 / 32, 1024 * 4 / 32, 1024 * 16 / 32, 1024 * 32 / 32}) {
+        // issue is size is 32 so everything indexes into 32
         std::vector<std::pair<bool, std::uint32_t>> cache(size);
         std::pair<int, int> result = std::make_pair(0, 0);
         for (auto p : t.accesses) {
-            //Calculate the cache line and the index
-            std::uint32_t line = p.first - p.first%32;
-            int index = (p.first%(size*32))/32;
-            if(cache[index].first && cache[index].second == line)
+            // Calculate the cache line and the index
+            std::uint32_t line = p.first - p.first % 32;
+            int index = (p.first % (size * 32)) / 32;
+            if (cache[index].first && cache[index].second == line)
                 result.first++;
             result.second++;
 
@@ -33,33 +34,33 @@ Result direct_mapped(const Trace& t) {
 Result set_associative(const Trace& t) {
     Result ret;
     std::vector<std::pair<int, int>> results;
-    for(int assoc: {2, 4, 8, 16}){
-        int size = ((1024*16)/32)/assoc;
-        std::vector<std::vector<std::pair<bool, std::uint32_t>>> 
-            cache(size, std::vector<std::pair<bool, std::uint32_t>>(assoc));
+    for (int assoc : {2, 4, 8, 16}) {
+        int size = ((1024 * 16) / 32) / assoc;
+        std::vector<std::vector<std::pair<bool, std::uint32_t>>> cache(
+            size, std::vector<std::pair<bool, std::uint32_t>>(assoc));
         std::vector<LRU> least_used(size);
         std::pair<int, int> result = std::make_pair(0, 0);
 
         for (auto p : t.accesses) {
-            //Calculate the cache line and the index
-            std::uint32_t line = p.first - p.first%32;
-            int index = (p.first%(size*32))/32;
+            // Calculate the cache line and the index
+            std::uint32_t line = p.first - p.first % 32;
+            int index = (p.first % (size * 32)) / 32;
 
             auto& ways = cache[index];
             auto& lru = least_used[index];
             bool hit = false;
-            //look for a hit
-            for(int i = 0; i < assoc; ++i){
-                if(ways[i].first && ways[i].second == line){
+            // look for a hit
+            for (int i = 0; i < assoc; ++i) {
+                if (ways[i].first && ways[i].second == line) {
                     hit = true;
                     lru.access(i);
                     break;
                 }
             }
-            if(hit)
+            if (hit)
                 result.first++;
-            else if(!hit){
-                //find an empty spot in the cache
+            else if (!hit) {
+                // find an empty spot in the cache
                 bool filled = false;
                 for (int i = 0; i < assoc; ++i) {
                     if (ways[i].first == false) {
@@ -69,13 +70,12 @@ Result set_associative(const Trace& t) {
                         break;
                     }
                 }
-                //otherwise evict something
-                if(!filled){
+                // otherwise evict something
+                if (!filled) {
                     int evict = lru.getLRU();
                     ways[evict] = std::make_pair(true, line);
                     lru.access(evict);
                 }
-
             }
             result.second++;
         }
@@ -87,59 +87,55 @@ Result set_associative(const Trace& t) {
 Result fully_associative(const Trace& t) {
     Result ret;
     std::vector<std::pair<int, int>> results;
-    int assoc = 1024*16/32; //associativity is 16kb/line size
-    //int assoc = 4;
+    int assoc = 1024 * 16 / 32;  // associativity is 16kb/line size
+    // int assoc = 4;
     std::vector<std::pair<bool, std::uint32_t>> cache(assoc);
-    std::vector<bool> hotcold(assoc-1);
+    std::vector<bool> hotcold(assoc - 1);
     std::pair<int, int> result = std::make_pair(0, 0);
 
     for (auto p : t.accesses) {
-        //Calculate the cache line and the index
-        std::uint32_t line = p.first - p.first%32;
+        // Calculate the cache line and the index
+        std::uint32_t line = p.first - p.first % 32;
         int index = -1;
-        for(int i = 0; i < cache.size(); i++){
-            if(cache[i].first && cache[i].second == line){
+        for (int i = 0; i < cache.size(); i++) {
+            if (cache[i].first && cache[i].second == line) {
                 result.first++;
                 index = i;
                 break;
             }
         }
         int start = 0, end = hotcold.size(), hcindex, prev = -1;
-        while(true){
-            hcindex = (start + end)/2;
-            //std::cout << start << " " << end << std::endl;
+        while (true) {
+            hcindex = (start + end) / 2;
 
-            if(index == -1){
-                if(hotcold[hcindex])
+            if (index == -1) {
+                if (hotcold[hcindex])
                     end = hcindex;
                 else
-                    start = hcindex+1;
+                    start = hcindex + 1;
             }
 
-            if(index != -1 && prev != hcindex){
-                if(index > hcindex){
+            if (index != -1 && prev != hcindex) {
+                if (index > hcindex) {
                     hotcold[hcindex] = 1;
-                    start = hcindex+1;
-                }
-                else if(index <= hcindex){
+                    start = hcindex + 1;
+                } else if (index <= hcindex) {
                     hotcold[hcindex] = 0;
                     end = hcindex;
                 }
             }
 
-
-            if(index == -1 && prev != hcindex){
+            if (index == -1 && prev != hcindex) {
                 hotcold[hcindex] = !hotcold[hcindex];
             }
             prev = hcindex;
-            
-            //Binary search has finished
-            if(end-start <= 0){
-                //If there was a cache miss then evict the LRU
-                //Otherwise the hotcold bits are updated and we're done
-                if(index == -1){
-                    if(hotcold[hcindex] == 1)
-                        cache[hcindex+1] = std::make_pair(true, line);
+            // Binary search has finished
+            if (end - start <= 0) {
+                // If there was a cache miss then evict the LRU
+                // Otherwise the hotcold bits are updated and we're done
+                if (index == -1) {
+                    if (hotcold[hcindex] == 1)
+                        cache[hcindex + 1] = std::make_pair(true, line);
                     else
                         cache[hcindex] = std::make_pair(true, line);
                 }
@@ -153,9 +149,197 @@ Result fully_associative(const Trace& t) {
     return ret;
 }
 
+Result fully_set_associative(const Trace& t) {
+    Result ret;
+    int assoc = 1024 * 16 / 32;  // associativity is 16kb/line size
+    int size = ((1024 * 16) / 32) / assoc;
+    std::vector<std::pair<bool, std::uint32_t>> cache(assoc);
+    std::vector<LRU> least_used(assoc);
+
+    std::vector<std::pair<int, int>> results;
+    std::pair<int, int> result = std::make_pair(0, 0);
+
+    for (auto p : t.accesses) {
+        // Calculate the cache line and the index
+        std::uint32_t line = p.first - p.first % 32;
+        int index = (p.first % (size * 32)) / 32;
+
+        auto& lru = least_used[index];
+        bool hit = false;
+        // look for a hit
+        for (int i = 0; i < assoc; ++i) {
+            if (cache[i].first && cache[i].second == line) {
+                hit = true;
+                lru.access(i);
+                break;
+            }
+        }
+        if (hit)
+            result.first++;
+        else if (!hit) {
+            // find an empty spot in the cache
+            bool filled = false;
+            for (int i = 0; i < assoc; ++i) {
+                if (cache[i].first == false) {
+                    lru.access(i);
+                    cache[i] = std::make_pair(true, line);
+                    filled = true;
+                    break;
+                }
+            }
+            // otherwise evict something
+            if (!filled) {
+                int evict = lru.getLRU();
+                cache[evict] = std::make_pair(true, line);
+                lru.access(evict);
+            }
+        }
+        result.second++;
+    }
+    ret.res.push_back(result);
+    return ret;
+}
+
+Result set_associative_no_alloc(const Trace& t) {
+    Result ret;
+    std::vector<std::pair<int, int>> results;
+    for (int assoc : {2, 4, 8, 16}) {
+        int size = ((1024 * 16) / 32) / assoc;
+        std::vector<std::vector<std::pair<bool, std::uint32_t>>> cache(
+            size, std::vector<std::pair<bool, std::uint32_t>>(assoc));
+        std::vector<LRU> least_used(size);
+        std::pair<int, int> result = std::make_pair(0, 0);
+
+        for (auto p : t.accesses) {
+            result.second++;
+            // Calculate the cache line and the index
+            std::uint32_t line = p.first - p.first % 32;
+            int index = (p.first % (size * 32)) / 32;
+
+            auto& ways = cache[index];
+            auto& lru = least_used[index];
+            bool hit = false;
+            // look for a hit
+            for (int i = 0; i < assoc; ++i) {
+                if (ways[i].first && ways[i].second == line) {
+                    hit = true;
+                    lru.access(i);
+                    break;
+                }
+            }
+            if (hit)
+                result.first++;
+            if(p.second)
+                continue;
+            else if (!hit) {
+                // find an empty spot in the cache
+                bool filled = false;
+                for (int i = 0; i < assoc; ++i) {
+                    if (ways[i].first == false) {
+                        lru.access(i);
+                        ways[i] = std::make_pair(true, line);
+                        filled = true;
+                        break;
+                    }
+                }
+                // otherwise evict something
+                if (!filled) {
+                    int evict = lru.getLRU();
+                    ways[evict] = std::make_pair(true, line);
+                    lru.access(evict);
+                }
+            }
+        }
+        ret.res.push_back(result);
+    }
+    return ret;
+}
+
+
+Result set_associative_prefetch(const Trace& t) {
+    Result ret;
+    std::vector<std::pair<int, int>> results;
+    for (int assoc : {4}) {
+        int size = ((1024 * 16) / 32) / assoc;
+        std::vector<std::vector<std::pair<bool, std::uint32_t>>> cache(
+            size, std::vector<std::pair<bool, std::uint32_t>>(assoc));
+        std::vector<LRU> least_used(size);
+        std::pair<int, int> result = std::make_pair(0, 0);
+
+        for (auto p : t.accesses) {
+            result.second++;
+            // Calculate the cache line and the index
+            std::uint32_t line = p.first - p.first % 32;
+            int index = (p.first % (size * 32)) / 32;
+            auto& ways = cache[index];
+            auto& lru = least_used[index];
+
+            bool hit = false;
+            // look for a hit
+            for (int i = 0; i < assoc; ++i) {
+                if (ways[i].first && ways[i].second == line) {
+                    hit = true;
+                    lru.access(i);
+                    break;
+                }
+            }
+            if (!hit) {
+                // find an empty spot in the cache
+                bool filled = false;
+                for (int i = 0; i < assoc; ++i) {
+                    if (ways[i].first == false) {
+                        lru.access(i);
+                        ways[i] = std::make_pair(true, line);
+                        filled = true;
+                        break;
+                    }
+                }
+                // otherwise evict something
+                if (!filled) {
+                    int evict = lru.getLRU();
+                    ways[evict] = std::make_pair(true, line);
+                    lru.access(evict);
+                }
+            }
+            // look for a hit on the prefetch line
+            bool hit_pref = false;
+            for (int i = 0; i < assoc; ++i) {
+                if (ways[i].first && ways[i].second == line+32) {
+                    hit_pref = true;
+                    lru.access(i);
+                    break;
+                }
+            }
+            if (!hit_pref) {
+                // find an empty spot in the cache
+                bool filled_pref = false;
+                for (int i = 0; i < assoc; ++i) {
+                    if (ways[i].first == false) {
+                        lru.access(i);
+                        ways[i] = std::make_pair(true, line+32);
+                        filled_pref = true;
+                        break;
+                    }
+                }
+                // otherwise evict something
+                if (!filled_pref) {
+                    int evict = lru.getLRU();
+                    ways[evict] = std::make_pair(true, line+32);
+                    lru.access(evict);
+                }
+            }
+            if (hit)
+                result.first++;
+        }
+        ret.res.push_back(result);
+    }
+    return ret;
+}
+
+
 
 int main(int argc, char** argv) {
-    if(argc != 3){
+    if (argc != 3) {
         std::cout << "ERROR WRONG ARGS\n";
         exit(0);
     }
@@ -164,5 +348,8 @@ int main(int argc, char** argv) {
 
     direct_mapped(t).print(output, true);
     set_associative(t).print(output);
+    fully_set_associative(t).print(output);
     fully_associative(t).print(output);
+    set_associative_no_alloc(t).print(output);
+    set_associative_prefetch(t).print(output);
 }

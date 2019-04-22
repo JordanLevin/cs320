@@ -42,6 +42,9 @@ struct LRU {
     int getLRU(){
         return entries.tail->val;
     }
+    int getMRU(){
+        return entries.head->val;
+    }
 
     void access(int val){
         if(map.count(val) == 0){
