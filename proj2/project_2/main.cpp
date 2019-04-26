@@ -84,11 +84,11 @@ Result set_associative(const Trace& t) {
     return ret;
 }
 
+//Hot cold
 Result fully_associative(const Trace& t) {
     Result ret;
     std::vector<std::pair<int, int>> results;
     int assoc = 1024 * 16 / 32;  // associativity is 16kb/line size
-    // int assoc = 4;
     std::vector<std::pair<bool, std::uint32_t>> cache(assoc);
     std::vector<bool> hotcold(assoc - 1);
     std::pair<int, int> result = std::make_pair(0, 0);
